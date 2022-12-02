@@ -36,4 +36,10 @@ extern volatile uint8_t CTL_INPUT_FLAGS;
  */
 void ctl_init();
 
+/**
+ * @brief Determines if button A has been pressed.
+ * @return uint8_t 1 if pressed, 0 otherwise.
+ */
+uint8_t ctl_isButtonAPressed();
+
 #endif
