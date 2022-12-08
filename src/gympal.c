@@ -10,7 +10,7 @@ int main() {
     PORTB &= ~(1 << PORTB4);
     uint8_t led = 0;
     while(1) {
-        uint8_t v = (CTL_INPUT_FLAGS & (1 << CTL_BUTTON_B_FLAG)) >> CTL_BUTTON_A_FLAG;
+        uint8_t v = ctl_isButtonAPressed();
         if (led != v) {
             led = v;
             if (led) {

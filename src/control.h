@@ -40,6 +40,16 @@ void ctl_init();
  * @brief Determines if button A has been pressed.
  * @return uint8_t 1 if pressed, 0 otherwise.
  */
-uint8_t ctl_isButtonAPressed();
+inline uint8_t ctl_isButtonAPressed() {
+    return (CTL_INPUT_FLAGS & (1 << CTL_BUTTON_A_FLAG)) >> CTL_BUTTON_A_FLAG;
+}
+
+inline uint8_t ctl_isButtonBPressed() {
+    return (CTL_INPUT_FLAGS & (1 << CTL_BUTTON_B_FLAG)) >> CTL_BUTTON_B_FLAG;
+}
+
+inline uint8_t ctl_isButtonCPressed() {
+    return (CTL_INPUT_FLAGS & (1 << CTL_BUTTON_C_FLAG)) >> CTL_BUTTON_C_FLAG;
+}
 
 #endif

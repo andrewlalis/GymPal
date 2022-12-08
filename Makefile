@@ -3,8 +3,13 @@ all: clean build
 clean:
 	rm -rf bin/
 
+# The following settings are very important!
+# -c arduino for flashing to an AVR device with arduino bootloader.
+# -p atmega328p is for the specific microcontroller.
+# -b 57600 is the baudrate for transmission. Nano boards ONLY accept 57600, uno boards might accept 115200.
+# -P specifies the port.
 flash: build
-	avrdude -c arduino -p atmega328p -P /dev/ttyUSB0 -b115200 -U flash:w:bin/gympal.hex:i
+	avrdude -c arduino -p atmega328p -P /dev/ttyUSB0 -b 57600 -U flash:w:bin/gympal.hex:i
 
 build: gympal.hex
 
