@@ -24,7 +24,19 @@ const string[] COMPILER_FLAGS = [
 ];
 
 int main(string[] args) {
-    build();
+    if (args.length < 2) {
+        return build();
+    }
+    string command = args[1].strip.toLower;
+    if (command == "build") return build();
+    if (command == "clean") return clean();
+
+    writefln!"Unknown command: \"%s\"."(command);
+    return 0;
+}
+
+int clean() {
+    rmdirRecurse(BUILD_DIR);
     return 0;
 }
 
