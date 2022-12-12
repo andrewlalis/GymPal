@@ -9,6 +9,8 @@ import std.file;
 import std.string;
 import std.conv;
 import std.path;
+import std.digest.md;
+import std.base64;
 
 const string MCU_ID = "atmega328p";
 const ulong CPU_FREQ = 16_000_000;
@@ -28,7 +30,11 @@ int main(string[] args) {
         return build();
     }
     string command = args[1].strip.toLower;
-    if (command == "build") return build();
+    if (command == "flash") {
+        build().quitIfNonZero();
+        return flashToMCU(buildPath("bin", "gympal.hex"));
+    }
+    if (command == "build") return build(true);
     if (command == "clean") return clean();
 
     writefln!"Unknown command: \"%s\"."(command);
@@ -40,18 +46,18 @@ int clean() {
     return 0;
 }
 
-int build() {
+int build(bool force = false) {
     if (!exists(BUILD_DIR)) mkdir(BUILD_DIR);
     string[] sources = findFiles(SOURCE_DIR, ".c");
-    writefln!"Found %d source files."(sources.length);
     string[] objects;
     objects.reserve(sources.length);
     foreach (source; sources) {
-        objects ~= compileSourceToObject(source);
+        objects ~= compileSourceToObject(source, force);
     }
     string elfFile = linkObjects(objects);
     string hexFile = copyToHex(elfFile);
     writefln!"Built %s"(hexFile);
+    runOrQuit("avr-size " ~ hexFile);
     return 0;
 }
 
@@ -70,11 +76,34 @@ void runOrQuit(string shellCommand, int[] successExitCodes = [0]) {
     if (!canFind(successExitCodes, result)) exit(result);
 }
 
-string compileSourceToObject(string sourcePath) {
+void quitIfNonZero(int n) {
+    import core.stdc.stdlib : exit;
+    if (n != 0) exit(n);
+}
+
+bool shouldCompileSource(string sourcePath) {
+    string name = baseName(sourcePath);
+    name = name[0 .. name.lastIndexOf('.')];
+    string hashPath = buildPath("bin", "hash", name ~ ".md5");
+    string objectPath = buildPath("bin", name ~ ".o");
+    if (!exists(hashPath) || !exists(objectPath)) return true;
+    ubyte[] storedHash = Base64.decode(readText(hashPath).strip());
+    ubyte[16] currentHash = md5Of(readText(sourcePath));
+    return storedHash != currentHash;
+}
+
+string compileSourceToObject(string sourcePath, bool force = false) {
     string flags = join(COMPILER_FLAGS, " ");
     string name = baseName(sourcePath);
     name = name[0 .. name.lastIndexOf('.')];
     string objectPath = buildPath("bin", name ~ ".o");
+    string hashPath = buildPath("bin", "hash", name ~ ".md5");
+
+    if (!force && !shouldCompileSource(sourcePath)) {
+        writefln!"Not compiling %s because no changes detected."(sourcePath);
+        return objectPath;
+    }
+
     string cmd = format!"avr-gcc %s -DF_CPU=%dUL -mmcu=%s -c -o %s %s"(
         flags,
         CPU_FREQ,
@@ -84,6 +113,12 @@ string compileSourceToObject(string sourcePath) {
     );
     writeln(cmd);
     runOrQuit(cmd);
+
+    ubyte[16] hash = md5Of(readText(sourcePath));
+    string hashDir = buildPath("bin", "hash");
+    if (!exists(hashDir)) mkdir(hashDir);
+    std.file.write(hashPath, Base64.encode(hash));
+
     return objectPath;
 }
 
