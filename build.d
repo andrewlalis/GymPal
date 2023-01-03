@@ -22,28 +22,64 @@ const string BUILD_DIR = "bin";
 
 const string[] COMPILER_FLAGS = [
     "-Wall",
-    "-Os"
+    "-Os",
+    "-g",
+    "-DF_CPU=16000000UL",
+    "-mmcu=atmega328p"
 ];
 
-int main(string[] args) {
-    if (args.length < 2) {
-        return build();
-    }
-    string command = args[1].strip.toLower;
-    if (command == "flash") {
-        build().quitIfNonZero();
-        return flashToMCU(buildPath("bin", "gympal.hex"));
-    }
-    if (command == "build") return build(true);
-    if (command == "clean") return clean();
+alias BuildCommand = int function(string[]);
 
-    writefln!"Unknown command: \"%s\"."(command);
+int main(string[] args) {
+    string command;
+    if (args.length < 2) {
+        command = "help";
+    } else {
+        command = args[1].strip.toLower;
+    }
+
+    BuildCommand[string] commandMap = [
+        "build": &buildCommand,
+        "flash": &flashCommand,
+        "clean": &clean,
+        "help": &helpCommand
+    ];
+
+    if (command !in commandMap) {
+        command = "help";
+    }
+
+    BuildCommand func = commandMap[command];
+    string[] commandArgs = [];
+    if (args.length > 2) commandArgs = args[2 .. $];
+    return func(commandArgs);
+}
+
+int helpCommand(string[] args) {
+    writeln("build.d - A simple build script for C files.");
+    writeln("The following commands are available:");
+    writeln("build [-f] - Compiles source code. Use -f to force rebuild.");
+    writeln("  By default, sources are hashed, and only built if changes are detected.");
+    writeln("flash [buildArgs] - Flashes code onto a connected AVR device via AVRDude.");
+    writeln("clean - Removes all build files.");
+    writeln("help - Shows this help information.");
     return 0;
 }
 
-int clean() {
+int clean(string[] args) {
     rmdirRecurse(BUILD_DIR);
     return 0;
+}
+
+int buildCommand(string[] args) {
+    import std.algorithm : canFind;
+    return build(canFind(args, "-f"));
+}
+
+int flashCommand(string[] args) {
+    int result = buildCommand(args);
+    if (result != 0) return result;
+    return flashToMCU(buildPath("bin", "gympal.hex"));
 }
 
 int build(bool force = false) {
@@ -104,10 +140,8 @@ string compileSourceToObject(string sourcePath, bool force = false) {
         return objectPath;
     }
 
-    string cmd = format!"avr-gcc %s -DF_CPU=%dUL -mmcu=%s -c -o %s %s"(
+    string cmd = format!"avr-gcc %s -c -o %s %s"(
         flags,
-        CPU_FREQ,
-        MCU_ID,
         objectPath,
         sourcePath
     );
@@ -138,7 +172,7 @@ string linkObjects(string[] objectPaths) {
 
 string copyToHex(string elfFile) {
     string hexFile = buildPath(BUILD_DIR, "gympal.hex");
-    string cmd = format!"avr-objcopy -O ihex -R .eeprom %s %s"(
+    string cmd = format!"avr-objcopy -j .data -j .text -O ihex %s %s"(
         elfFile,
         hexFile
     );
@@ -148,9 +182,8 @@ string copyToHex(string elfFile) {
 }
 
 int flashToMCU(string hexFile) {
-    string cmd = format!"avrdude -c %s -p %s -P /dev/ttyUSB0 -b %d flash:w:%s:i"(
+    string cmd = format!"avrdude -c %s -p m328p -P /dev/ttyUSB0 -b %d -u -U flash:w:%s:i"(
         BOOTLOADER,
-        MCU_ID,
         AVRDUDE_BAUDRATE,
         hexFile
     );

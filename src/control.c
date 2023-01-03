@@ -29,8 +29,7 @@ void ctl_init() {
         (1 << CTL_ROTARY_ENCODER_DT) |
         (1 << CTL_ROTARY_ENCODER_CLK) |
         (1 << CTL_BUTTON_A) |
-        (1 << CTL_BUTTON_B) |
-        (1 << CTL_BUTTON_C)
+        (1 << CTL_BUTTON_B)
     );
     // Set up interrupts for handling control pin state changes.
     // Luckily, all interrupts happen on PCINT[16..23] so we only need one interrupt to handle them all.
@@ -39,8 +38,7 @@ void ctl_init() {
         (1 << CTL_ROTARY_ENCODER_DT_INT) |
         (1 << CTL_ROTARY_ENCODER_CLK_INT) |
         (1 << CTL_BUTTON_A_INT) |
-        (1 << CTL_BUTTON_B_INT) |
-        (1 << CTL_BUTTON_C_INT)
+        (1 << CTL_BUTTON_B_INT)
     );
     // Enable the global interrupt flag.
     sei();
