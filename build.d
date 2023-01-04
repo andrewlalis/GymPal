@@ -83,16 +83,20 @@ int flashCommand(string[] args) {
 }
 
 int build(bool force = false) {
+    import std.datetime.stopwatch;
     if (!exists(BUILD_DIR)) mkdir(BUILD_DIR);
     string[] sources = findFiles(SOURCE_DIR, ".c");
     string[] objects;
     objects.reserve(sources.length);
+    StopWatch sw = StopWatch(AutoStart.yes);
     foreach (source; sources) {
         objects ~= compileSourceToObject(source, force);
     }
     string elfFile = linkObjects(objects);
     string hexFile = copyToHex(elfFile);
-    writefln!"Built %s"(hexFile);
+    sw.stop();
+    ulong durationMillis = sw.peek().total!"msecs";
+    writefln!"Built %s in %d ms."(hexFile, durationMillis);
     runOrQuit("avr-size " ~ hexFile);
     return 0;
 }

@@ -7,12 +7,12 @@
 int main() {
     display_init();
     ctl_init();
-    while (1) {
-      if (ctl_isButtonAPressed()) {
-        display_show_str("button A");
-      } else {
-        display_show_str("Not button A");
-      }
-    }
+    // while (1) {
+    //   if (ctl_isButtonAPressed()) {
+    //     display_show_str("button A");
+    //   } else {
+    //     display_show_str("Not button A");
+    //   }
+    // }
     return 0;
 }
