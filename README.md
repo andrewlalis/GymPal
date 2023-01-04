@@ -6,9 +6,13 @@ The GymPal is a lightweight piece of hardware with built-in storage, time-keepin
 ## Development
 The software for this system is developed in C, using [avr-libc](https://www.nongnu.org/avr-libc/), and the build toolchain is managed by make, using [avr-gcc](https://linux.die.net/man/1/avr-gcc) and [avr-dude](https://github.com/avrdudes/avrdude) to upload firmware to the Atmega328p microcontroller.
 
-To compile the firmware, you can run `make`.
+```shell
+sudo apt install gcc-avr
+sudo apt install avr-libc
+sudo apt install avrdude
+```
 
-To upload the firmware to an Arduino, run `make flash`.
+After cloning this repository, you must first compile the build script with `./prepare-build-tools.d`. Then, you can run `./build <command>` to run various build commands. See `./build help` for more information.
 
 ## Hardware
 Here's a list of the hardware that this project uses, just for reference:

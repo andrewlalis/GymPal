@@ -1,5 +1,6 @@
 #include "display.h"
 
+// Chip Select
 struct signal cs = { .ddr = &DDRB, .port = &PORTB, .pin = 2 };
 // Back Light
 struct signal bl = { .ddr = &DDRB, .port = &PORTB, .pin = 1 };

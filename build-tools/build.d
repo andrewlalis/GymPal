@@ -9,13 +9,9 @@ import std.file;
 import std.string;
 import std.conv;
 import std.path;
-import std.digest.md;
-import std.base64;
 
-const string MCU_ID = "atmega328p";
-const ulong CPU_FREQ = 16_000_000;
-const string BOOTLOADER = "arduino";
-const ulong AVRDUDE_BAUDRATE = 57_600;
+import util;
+import hash;
 
 const string SOURCE_DIR = "src";
 const string BUILD_DIR = "bin";
@@ -28,12 +24,20 @@ const string[] COMPILER_FLAGS = [
     "-mmcu=atmega328p"
 ];
 
+const string[] AVRDUDE_FLAGS = [
+    "-c arduino",
+    "-p m328p",
+    "-P /dev/ttyUSB0",
+    "-b 57600",
+    "-u"
+];
+
 alias BuildCommand = int function(string[]);
 
 int main(string[] args) {
     string command;
     if (args.length < 2) {
-        command = "help";
+        command = "build";
     } else {
         command = args[1].strip.toLower;
     }
@@ -57,16 +61,21 @@ int main(string[] args) {
 
 int helpCommand(string[] args) {
     writeln("build.d - A simple build script for C files.");
+    writeln("--------------------------------------------");
+    writeln("Usage: ./build.d <command> [args...]");
+    writeln("");
     writeln("The following commands are available:");
-    writeln("build [-f] - Compiles source code. Use -f to force rebuild.");
-    writeln("  By default, sources are hashed, and only built if changes are detected.");
-    writeln("flash [buildArgs] - Flashes code onto a connected AVR device via AVRDude.");
-    writeln("clean - Removes all build files.");
-    writeln("help - Shows this help information.");
+    writeln("  build [-f]    Compiles source code. Use -f to force rebuild.");
+    writeln("                By default, sources are hashed, and only built if changes are detected.");
+    writeln("                This is also the default command if none is specified.");
+    writeln("  flash         Flashes code onto a connected AVR device via AVRDude.");
+    writeln("  clean         Removes all build files.");
+    writeln("  help          Shows this help information.");
     return 0;
 }
 
 int clean(string[] args) {
+    if (!exists(BUILD_DIR)) return 0;
     rmdirRecurse(BUILD_DIR);
     return 0;
 }
@@ -77,9 +86,16 @@ int buildCommand(string[] args) {
 }
 
 int flashCommand(string[] args) {
-    int result = buildCommand(args);
-    if (result != 0) return result;
-    return flashToMCU(buildPath("bin", "gympal.hex"));
+    string hexFilePath = buildPath(BUILD_DIR, "gympal.hex");
+    if (!exists(hexFilePath)) {
+        writeln("Hex file doesn't exist yet; building it now.");
+        int result = buildCommand(args);
+        if (result != 0) return result;
+    }
+    string flags = join(AVRDUDE_FLAGS, " ");
+    string cmd = format!"avrdude %s -U flash:w:%s:i"(flags, hexFilePath);
+    writeln(cmd);
+    return run(cmd);
 }
 
 int build(bool force = false) {
@@ -101,35 +117,8 @@ int build(bool force = false) {
     return 0;
 }
 
-//-------- Utility functions below here -------
-
-int run(string shellCommand) {
-    import std.process : Pid, spawnShell, wait;
-    Pid pid = spawnShell(shellCommand);
-    return wait(pid);
-}
-
-void runOrQuit(string shellCommand, int[] successExitCodes = [0]) {
-    import core.stdc.stdlib : exit;
-    import std.algorithm : canFind;
-    int result = run(shellCommand);
-    if (!canFind(successExitCodes, result)) exit(result);
-}
-
-void quitIfNonZero(int n) {
-    import core.stdc.stdlib : exit;
-    if (n != 0) exit(n);
-}
-
 bool shouldCompileSource(string sourcePath) {
-    string name = baseName(sourcePath);
-    name = name[0 .. name.lastIndexOf('.')];
-    string hashPath = buildPath("bin", "hash", name ~ ".md5");
-    string objectPath = buildPath("bin", name ~ ".o");
-    if (!exists(hashPath) || !exists(objectPath)) return true;
-    ubyte[] storedHash = Base64.decode(readText(hashPath).strip());
-    ubyte[16] currentHash = md5Of(readText(sourcePath));
-    return storedHash != currentHash;
+    return !contentMatchesHash(sourcePath);
 }
 
 string compileSourceToObject(string sourcePath, bool force = false) {
@@ -137,7 +126,6 @@ string compileSourceToObject(string sourcePath, bool force = false) {
     string name = baseName(sourcePath);
     name = name[0 .. name.lastIndexOf('.')];
     string objectPath = buildPath("bin", name ~ ".o");
-    string hashPath = buildPath("bin", "hash", name ~ ".md5");
 
     if (!force && !shouldCompileSource(sourcePath)) {
         writefln!"Not compiling %s because no changes detected."(sourcePath);
@@ -151,12 +139,7 @@ string compileSourceToObject(string sourcePath, bool force = false) {
     );
     writeln(cmd);
     runOrQuit(cmd);
-
-    ubyte[16] hash = md5Of(readText(sourcePath));
-    string hashDir = buildPath("bin", "hash");
-    if (!exists(hashDir)) mkdir(hashDir);
-    std.file.write(hashPath, Base64.encode(hash));
-
+    saveHash(sourcePath);
     return objectPath;
 }
 
@@ -183,26 +166,4 @@ string copyToHex(string elfFile) {
     writeln(cmd);
     runOrQuit(cmd);
     return hexFile;
-}
-
-int flashToMCU(string hexFile) {
-    string cmd = format!"avrdude -c %s -p m328p -P /dev/ttyUSB0 -b %d -u -U flash:w:%s:i"(
-        BOOTLOADER,
-        AVRDUDE_BAUDRATE,
-        hexFile
-    );
-    writeln(cmd);
-    return run(cmd);
-}
-
-string[] findFiles(string path, string suffix = null) {
-    import std.array;
-    import std.algorithm;
-    auto app = appender!(string[]);
-    foreach (DirEntry entry; dirEntries(path, SpanMode.breadth, false)) {
-        if (entry.isFile && (suffix is null || entry.name.endsWith(suffix))) {
-            app ~= entry.name;
-        }
-    }
-    return app[];
 }
